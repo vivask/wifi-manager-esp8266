@@ -14,7 +14,7 @@
 
 
 /* @brief tag used for ESP serial console messages */
-static const char TAG[] = "http_server";
+static const char TAG[] = "http_app";
 
 /* @brief the HTTP server handle */
 static httpd_handle_t httpd_handle = NULL;
@@ -28,6 +28,7 @@ static char* http_root_url = NULL;
 static char* http_redirect_url = NULL;
 static char* http_js_url = NULL;
 static char* http_css_url = NULL;
+static char* http_favicon_url = NULL;
 static char* http_connect_url = NULL;
 static char* http_ap_url = NULL;
 static char* http_status_url = NULL;
@@ -37,12 +38,14 @@ static char* http_status_url = NULL;
  * @see file "component.mk"
  * @see https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#embedding-binary-data
  */
+extern const uint8_t index_html_start[] asm("_binary_index_html_start");
+extern const uint8_t index_html_end[] asm("_binary_index_html_end");
+extern const uint8_t favicon_ico_start[] asm("_binary_favicon_ico_start");
+extern const uint8_t favicon_ico_end[] asm("_binary_favicon_ico_end");
 extern const uint8_t style_css_start[] asm("_binary_style_css_start");
 extern const uint8_t style_css_end[]   asm("_binary_style_css_end");
 extern const uint8_t code_js_start[] asm("_binary_code_js_start");
 extern const uint8_t code_js_end[] asm("_binary_code_js_end");
-extern const uint8_t index_html_start[] asm("_binary_index_html_start");
-extern const uint8_t index_html_end[] asm("_binary_index_html_end");
 
 
 /* const httpd related values stored in ROM */
@@ -217,6 +220,12 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
 			httpd_resp_set_type(req, http_content_type_html);
 			httpd_resp_send(req, (char*)index_html_start, index_html_end - index_html_start);
 		}
+		/* GET /favicon.js */
+		else if(strcmp(req->uri, http_favicon_url) == 0){
+			httpd_resp_set_status(req, http_200_hdr);
+			httpd_resp_set_type(req, http_content_type_js);
+			httpd_resp_send(req, (char*)favicon_ico_start, favicon_ico_end - favicon_ico_start);
+		}
 		/* GET /code.js */
 		else if(strcmp(req->uri, http_js_url) == 0){
 			httpd_resp_set_status(req, http_200_hdr);
@@ -302,20 +311,50 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
 }
 
 /* URI wild card for any GET request */
-static const httpd_uri_t http_server_get_request = {
+static const httpd_uri_t http_server_get_index_request = {
     .uri       = "/",
     .method    = HTTP_GET,
     .handler   = http_server_get_handler
 };
 
-static const httpd_uri_t http_server_post_request = {
-	.uri	= "*",
+static const httpd_uri_t http_server_get_favicon_request = {
+    .uri       = "/favicon.ico",
+    .method    = HTTP_GET,
+    .handler   = http_server_get_handler
+};
+
+static const httpd_uri_t http_server_get_style_request = {
+    .uri       = "/style.css",
+    .method    = HTTP_GET,
+    .handler   = http_server_get_handler
+};
+
+static const httpd_uri_t http_server_get_code_request = {
+    .uri       = "/code.js",
+    .method    = HTTP_GET,
+    .handler   = http_server_get_handler
+};
+
+static const httpd_uri_t http_server_get_ap_request = {
+    .uri       = "/ap.json",
+    .method    = HTTP_GET,
+    .handler   = http_server_get_handler
+};
+
+static const httpd_uri_t http_server_get_status_request = {
+    .uri       = "/status.json",
+    .method    = HTTP_GET,
+    .handler   = http_server_get_handler
+};
+
+static const httpd_uri_t http_server_post_connect_request = {
+	.uri	= "/connect.json",
 	.method = HTTP_POST,
 	.handler = http_server_post_handler
 };
 
 static const httpd_uri_t http_server_delete_request = {
-	.uri	= "*",
+	.uri	= "/",
 	.method = HTTP_DELETE,
 	.handler = http_server_delete_handler
 };
@@ -334,6 +373,10 @@ void http_app_stop(){
 		if(http_redirect_url){
 			free(http_redirect_url);
 			http_redirect_url = NULL;
+		}
+		if(http_favicon_url){
+			free(http_favicon_url);
+			http_favicon_url = NULL;
 		}
 		if(http_js_url){
 			free(http_js_url);
@@ -398,6 +441,7 @@ void http_app_start(bool lru_purge_enable){
 			/* all the pages */
 			const char page_js[] = "code.js";
 			const char page_css[] = "style.css";
+			const char page_ico[] = "favicon.ico";
 			const char page_connect[] = "connect.json";
 			const char page_ap[] = "ap.json";
 			const char page_status[] = "status.json";
@@ -424,6 +468,7 @@ void http_app_start(bool lru_purge_enable){
 
 			/* generate the other pages URLs*/
 			http_js_url = http_app_generate_url(page_js);
+			http_favicon_url = http_app_generate_url(page_ico);
 			http_css_url = http_app_generate_url(page_css);
 			http_connect_url = http_app_generate_url(page_connect);
 			http_ap_url = http_app_generate_url(page_ap);
@@ -435,8 +480,13 @@ void http_app_start(bool lru_purge_enable){
 
 	    if (err == ESP_OK) {
 	        ESP_LOGI(TAG, "Registering URI handlers");
-	        httpd_register_uri_handler(httpd_handle, &http_server_get_request);
-	        httpd_register_uri_handler(httpd_handle, &http_server_post_request);
+	        httpd_register_uri_handler(httpd_handle, &http_server_get_index_request);
+	        httpd_register_uri_handler(httpd_handle, &http_server_get_favicon_request);
+	        httpd_register_uri_handler(httpd_handle, &http_server_get_style_request);
+	        httpd_register_uri_handler(httpd_handle, &http_server_get_code_request);
+	        httpd_register_uri_handler(httpd_handle, &http_server_get_ap_request);
+	        httpd_register_uri_handler(httpd_handle, &http_server_get_status_request);
+	        httpd_register_uri_handler(httpd_handle, &http_server_post_connect_request);
 	        httpd_register_uri_handler(httpd_handle, &http_server_delete_request);
 	    }
 	}

@@ -46,20 +46,6 @@
 
 static const char *TAG = "flash_log";
 
-/**
- * @brief embedded binary data.
- * @see file "component.mk"
- * @see https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#embedding-binary-data
- */
-extern const uint8_t index_html_start[] asm("_binary_index_html_start");
-extern const uint8_t index_html_end[] asm("_binary_index_html_end");
-extern const uint8_t favicon_ico_start[] asm("_binary_favicon_ico_start");
-extern const uint8_t favicon_ico_end[] asm("_binary_favicon_ico_end");
-extern const uint8_t style_css_start[] asm("_binary_style_css_start");
-extern const uint8_t style_css_end[]   asm("_binary_style_css_end");
-extern const uint8_t code_js_start[] asm("_binary_code_js_start");
-extern const uint8_t code_js_end[] asm("_binary_code_js_end");
-
 /* objects used to manipulate the main queue of events */
 QueueHandle_t flash_log_queue;
 /* @brief task handle for the flash log task */
@@ -266,22 +252,6 @@ static void cb_http_client_not_ready(void* pvParameters) {
     xEventGroupClearBits(flash_log_events, HC_STATUS_OK);
 }
 
-static esp_err_t install_web() {
-    if(save_flash_data((char*)index_html_start, index_html_end - index_html_start, STORE_BASE_PATH"/index.html") != ESP_OK) {
-        return ESP_FAIL;
-    }
-    //     if(save_flash_data((char*)favicon_ico_start, favicon_ico_end - favicon_ico_start, STORE_BASE_PATH"/favicon.ico") != ESP_OK) {
-    //         return ESP_FAIL;
-    //     }
-    if(save_flash_data((char*)code_js_start, code_js_end - code_js_start, STORE_BASE_PATH"/code.js") != ESP_OK) {
-        return ESP_FAIL;
-    }
-    if(save_flash_data((char*)style_css_start, style_css_end - style_css_start, STORE_BASE_PATH"/style.css") != ESP_OK) {
-        return ESP_FAIL;
-    }
-    return ESP_OK;
-}
-
 void init_flash() {
     esp_err_t ret = nvs_flash_init();
     if(ret == ESP_ERR_NVS_NO_FREE_PAGES)
@@ -297,9 +267,6 @@ void init_flash() {
 		CONFIG_STORE_MAX_FILES
 		));
    
-    /* save web server files to storage*/
-    ESP_ERROR_CHECK(install_web());
-
 #ifdef CONFIG_USE_FLASH_LOGGING    
 	/* memory allocation */
 	flash_log_queue = xQueueCreate( 4, sizeof(flash_log_request_t) );  

@@ -1,17 +1,219 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
+	<head>
+		<meta charset="utf-8"/>
     <link rel="icon" type="image/ico" href="favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ESP8266 Setup</title>
-    <!-- <script type="module" crossorigin src="code.js"></script> -->
-    <!-- <link rel="stylesheet" href="style.css"> -->
-  </head>
-  <body>
-    <!-- <div id="app"></div> -->
-    <header>
-      <h1>TEST</h1>
-    </header>
-  </body>
-</html>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<link rel="stylesheet" href="style.css">
+		<script async src="code.js"></script>
+		<title>esp8266-wifi-manager</title>
+	</head>
+	<body>
+		<div id="ap_select">
+			<div class="card__header">
+				<h1>Available Access Points</h1>
+			</div>
+			<div class="card__content">
+				<h2>Manual connect</h2>
+				<input type="button" class="button-manual-ssid" onclick="handleSelectSSID()" value="ADD (HIDDEN) SSID"/>
+				<h2>or choose a network...</h2>
+				<section id="wifi-list">
+					<div class="ape"><div class="w1"><div class="pw">DAP-1</div></div></div>
+				</section>
+				<div><em>Powered by </em><a id="acredits" href="#"><strong>esp8266-wifi-manager</strong></a>.</div>
+			</div>
+		</div>
+
+		<div id="wifi_setup">
+			<div class="card__header">
+				<h1>WiFi Security Setup</h1>
+			</div>
+			<div class="card__content">					
+				<div class="group">
+					<label class="group__label">SSID</label>
+					<input id="wifi_ssid" class="input__text" type="text" value="" oninput="checkFormSecurity()">
+				</div>
+				<div class="group mt-10">
+					<label class="group__label">Auth mode</label>
+					<select id="wifi_wpa" class="select__text" onchange="handleWpaChange(this.options[this.selectedIndex].value)">
+						<option selected value="personal">WPA & WPA2 Personal</option>
+						<option value="enterprise">WPA & WPA2 Enterprise</option>
+					</select>
+				</div>
+				<div id="wpa_enterprise">
+					<div class="group mt-10">
+						<label class="group__label">Authentication</label>
+						<select id="wifi_auth" class="select__text" onchange="handleAuthChange(this.options[this.selectedIndex].value)">
+							<option selected value="peap">PEAP</option>
+							<option value="ttls">TTLS</option>
+							<option value="tls">TLS</option>
+						</select>
+					</div>	
+					<div class="group mt-10">
+						<label class="group__label">Identity</label>
+						<input id="wifi_identity" class="input__text" type="text" value="" oninput="checkFormSecurity()">
+					</div>
+					<div class="group mt-10">
+						<div class="group__check">
+							<input id="cb-username" type="checkbox" onchange="handleUseUsername(this.checked)"/>
+							<label>Username</label>
+						</div>
+						<input id="wifi_username" disabled class="input__text" type="text" value="" oninput="checkFormSecurity()">
+					</div>
+				</div>
+				<div id="wifi_password_visible">
+					<div class="group mt-10">
+						<label class="group__label">Password</label>
+						<input id="wifi_password" class="input__text" type="password" value="" oninput="checkFormSecurity()">
+					</div>
+				</div>
+				<div id="auth_tls">
+					<div class="group mt-10">
+						<label class="group__label">CA certificate</label>
+						<input id="wifi_tls_ca" class="input__file" type="file" value="" accept=".pem,.crt" oninput="checkFormSecurity()">
+					</div>
+					<div class="group mt-10">
+						<label class="group__label">User certificate</label>
+						<input id="wifi_crt" class="input__file" type="file" value="" accept=".pem,.crt" oninput="checkFormSecurity()">
+					</div>
+					<div class="group mt-10">
+						<label class="group__label">User private key</label>
+						<input id="wifi_key" class="input__file" type="file" value="" accept=".key" oninput="checkFormSecurity()">
+					</div>
+				</div>
+				<div id="auth_no_tls">
+					<div class="group mt-10">
+						<div class="group__check">
+							<input id="cb-ca" type="checkbox" onchange="handleUseCA(this.checked)" />
+							<label>CA certificate</label>
+						</div>
+						<input id="wifi_ca" disabled class="input__file" type="file" accept=".pem,.crt" value="" oninput="checkFormSecurity()">
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div id="ipv4_setup">
+			<div class="card__header">
+				<h1>IpV4 Settings</h1>
+			</div>
+			<div class="card__content">
+				<div class="group">
+					<label class="group__label">Method</label>
+					<select id="ipv4_method" class="select__text" onchange="handleIpv4MethodChange(this.options[this.selectedIndex].value)">
+						<option selected value="auto">Automatic (DHCP)</option>
+						<option value="manual">Manual</option>
+					</select>
+				</div>
+				<div id="ipv4_manul">
+					<div class="group mt-10">
+						<label class="group__label">Address</label>
+						<input id="ipv4_address" class="input__text" type="text" value="" oninput="checkFormIpv4()">
+					</div>
+					<div class="group mt-10">
+						<label class="group__label">Netmask</label>
+						<input id="ipv4_mask" class="input__text" type="text" value="" oninput="checkFormIpv4()">
+					</div>
+					<div class="group mt-10">
+						<label class="group__label">Gateway</label>
+						<input id="ipv4_gate" class="input__text" type="text" value="" oninput="checkFormIpv4()">
+					</div>
+					<div class="group mt-10">
+						<label class="group__label">DNS Server</label>
+						<input id="ipv4_dns1" class="input__text" type="text" value="" oninput="checkFormIpv4()">
+					</div>
+					<div class="group mt-10">
+						<label class="group__label">DNS Server</label>
+						<input id="ipv4_dns2" class="input__text" type="text" value="" oninput="checkFormIpv4()">
+					</div>
+				</div>
+				<div class="group mt-10">
+					<label class="group__label">Timezone</label>
+					<select id="ipv4_zone" class="select__text">
+						<option selected value="<+03>-3">Europe/Minsk</option>
+					</select>
+				</div>
+				<div class="group mt-10">
+					<div class="group__check">
+						<input id="cb-ntp" type="checkbox" checked onchange="handleUseNtp(this.checked)"/>
+						<label>NTP Server</label>
+					</div>
+					<input id="ipv4_ntp" class="input__text" type="text" value="" oninput="checkFormIpv4()">
+				</div>
+			</div>
+		</div>
+
+		<div id="server_setup">
+			<div class="card__header">
+				<h1>HTTP Client Settings</h1>
+			</div>
+			<div class="card__content">
+				<div class="group">
+					<label class="group__label">Server Address</label>
+					<input id="server_address" class="input__text" type="text" value="" oninput="checkFormHttpClient()">
+				</div>
+				<div class="group mt-10">
+					<label class="group__label">Server Port</label>
+					<input id="server_port" class="input__text" type="text" value="" oninput="checkFormHttpClient()">
+				</div>
+				<div class="group mt-10">
+					<label class="group__label">Server Api</label>
+					<input id="server_api" class="input__text" type="text" value="" oninput="checkFormHttpClient()">
+				</div>
+				<div class="group mt-10">
+					<div class="group__check">
+						<input id="cb-esp" type="checkbox" checked onchange="handleUseEspKey(this.checked)" />
+						<label>ESP json key</label>
+					</div>
+					<input id="esp_json_key" class="input__text" type="text" value="" oninput="checkFormHttpClient()">
+				</div>
+				<div class="group mt-10">
+					<div class="group__check">
+						<input id="cb-stm" type="checkbox" checked onchange="handleUseStmKey(this.checked)" />
+						<label>STM json key</label>
+					</div>
+					<input id="stm_json_key" class="input__text" type="text" value="" oninput="checkFormHttpClient()">
+				</div>
+				<div class="group mt-10">
+					<label class="group__label">Auth Method</label>
+					<select id="server_auth" class="select__text" onchange="handleServerAuthChange(this.options[this.selectedIndex].value)">
+						<option selected value="no">No auth</option>
+						<option value="basic">Basic</option>
+						<option value="tls">TLS</option>
+					</select>
+				</div>
+				<div id="server_auth_basic">
+					<div class="group mt-10">
+						<label class="group__label">Username</label>
+						<input id="client_username" class="input__text" type="text" value="" oninput="checkFormHttpClient()">
+					</div>
+					<div class="group mt-10">
+						<label class="group__label">Password</label>
+						<input id="client_password" class="input__text" type="password" value="" oninput="checkFormHttpClient()">
+					</div>
+				</div>
+				<div id="server_auth_tls">
+					<div class="group mt-10">
+						<label class="group__label">CA certificate</label>
+						<input id="server_ca" class="input__file" type="file" value="" accept=".pem,.crt" oninput="checkFormHttpClient()">
+					</div>
+					<div class="group mt-10">
+						<label class="group__label">User certificate</label>
+						<input id="client_crt" class="input__file" type="file" value="" accept=".pem,.crt" oninput="checkFormHttpClient()">
+					</div>
+					<div class="group mt-10">
+						<label class="group__label">User private key</label>
+						<input id="client_key" class="input__file" type="file" value="" accept=".key" oninput="checkFormHttpClient()">
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div id="navigation" class="navigation-bar">
+			<button id="back" class="navigation-btn" onclick="handleBackClick()">Go Back</button>
+			<button id="next" class="navigation-btn navigation-btn-next" onclick="handleNextClick()">Next</button>
+		</div>
+
+	</body>
+<html>

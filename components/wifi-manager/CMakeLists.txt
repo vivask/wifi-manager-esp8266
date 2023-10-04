@@ -12,5 +12,6 @@ idf_component_register(SRCS "src/manager.c"
                             "src/ota.c"
                             "src/cb_list.c"
                         INCLUDE_DIRS include
-                        EMBED_FILES dist/assets/style.css dist/assets/code.js dist/index.html dist/favicon.ico
+                        EMBED_FILES dist/style.css dist/code.js dist/index.html dist/favicon.ico
+                        # EMBED_FILES vue/style.css vue/code.js vue/index.html vue/favicon.ico
                         )

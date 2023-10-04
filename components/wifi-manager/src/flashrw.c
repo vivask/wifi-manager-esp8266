@@ -30,7 +30,7 @@ static const char *TAG = "flashrw";
 
 esp_err_t save_flash_data(void* data, const size_t sz, const char* fName){
 	esp_err_t esp_err = ESP_FAIL;
-    FILE *f = fopen(fName, "w");
+    FILE *f = fopen(fName, "wb");
     if (f == NULL) {
         ESP_LOGE(TAG, "Failed to open file %s for writing", fName);
     }else{

@@ -129,12 +129,12 @@ void app_main()
     wifi_manager_start(false);
 
     /* HTTP Client initialize */
-    http_client_initialize();
+    // http_client_initialize();
 
     /* Callbacks link */
-    http_client_set_response_callback(&cb_http_client_response);
-    http_client_set_ready_callback(&cb_http_client_ready);
-    http_client_set_not_ready_callback(&cb_http_client_not_ready);
+    // http_client_set_response_callback(&cb_http_client_response);
+    // http_client_set_ready_callback(&cb_http_client_ready);
+    // http_client_set_not_ready_callback(&cb_http_client_not_ready);
 
     /* Waiting for HTTP client initialization*/
     // xEventGroupWaitBits(
