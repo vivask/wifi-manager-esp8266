@@ -1,6 +1,6 @@
 header {
   background-color: #fff;
-  border-bottom: 1px solid #888;
+  /* border-bottom: 1px solid #888; */
 }
 section {
   background-color: #fff;
@@ -27,6 +27,33 @@ h3 {
   text-align: center;
   padding: 20px 0px 20px 0px;
 }
+.credits-bar{
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+.credits-btn {
+  width: 100px;
+  padding: 5px;
+  text-align: center;
+  display: block;
+}
+.tctr {
+  text-align: center;
+}
+.panel {
+  color: #333;
+  background-color: #fff;
+  border-radius: 15px;
+  padding: 25px 25px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+  width: 800px; 
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-50%);  
+}
 
 /* Input text */
 .input__text {
@@ -47,6 +74,7 @@ h3 {
 .input__text:disabled {
   color: rgba(97, 97, 97, 0.5);
 }
+/* end Input text */
 
 /* Select */
 .select__text {
@@ -70,6 +98,7 @@ h3 {
 .select__text:invalid {
   color: rgba(97, 97, 97, 0.5);
 }
+/* end Select */
 
 /* Input file */
 .input__file {
@@ -84,14 +113,7 @@ h3 {
   color: #4c6bb6;
   background-color: #fff;
 }
-
-.p-error {
-  color: #c63737;
-}
-
-.p-invalid {
-  box-shadow: inset 0px 0px 1px 1px #c63737;
-}
+/* end Input file */
 
 /* Button manual SSID select */
 .button-manual-ssid {
@@ -114,6 +136,7 @@ h3 {
 .button-manual-ssid:hover {
   box-shadow: inset 0px 0px 2px 2px rgba(97, 97, 97, 0.5);
 }
+/* end Button manual SSID select */
 
 /* Group container */
 .group {
@@ -144,6 +167,7 @@ h3 {
   box-sizing: border-box;
   min-width: 160px;
 }
+/* end Group container */
 
 /* Margin top 10px */
 .mt-10 {
@@ -182,6 +206,7 @@ h3 {
   color: #fff;
   margin-right: 0px;
 }
+/* end Navigation bar */
 
 /* Initialize */
 #ap_select {
@@ -220,6 +245,16 @@ h3 {
 #navigation {
   display: none;
 }
+#loading {
+  display: none;
+}
+#setup-fail {
+  display: none;
+}
+#credits {
+  display: none;
+}
+/* end Initialize */
 
 /* WiFi list acces points */
 .w0 {
@@ -256,4 +291,48 @@ h3 {
 .brdb {
   border-bottom: 1px solid #888;
 }
+/* end WiFi list acces points */
 
+/* SpinKit is licensed under the MIT License. Copyright (c) 2015 Tobias Ahlin */
+.spinner {
+  width: 40px;
+  height: 40px;
+  position: relative;
+  margin: 100px auto;
+}
+.double-bounce1,
+.double-bounce2 {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background-color: #333;
+  opacity: 0.6;
+  position: absolute;
+  top: 0;
+  left: 0;
+  -webkit-animation: sk-bounce 2.0s infinite ease-in-out;
+  animation: sk-bounce 2.0s infinite ease-in-out;
+}
+.double-bounce2 {
+  -webkit-animation-delay: -1.0s;
+  animation-delay: -1.0s;
+}
+@-webkit-keyframes sk-bounce {
+  0%, 100% {
+      -webkit-transform: scale(0.0)
+  }
+  50% {
+      -webkit-transform: scale(1.0)
+  }
+}
+@keyframes sk-bounce {
+  0%, 100% {
+      transform: scale(0.0);
+      -webkit-transform: scale(0.0);
+  }
+  50% {
+      transform: scale(1.0);
+      -webkit-transform: scale(1.0);
+  }
+}
+/* end of SpinKit */

@@ -10,24 +10,27 @@
 		<title>esp8266-wifi-manager</title>
 	</head>
 	<body>
+		<div class="panel">
 		<div id="ap_select">
 			<div class="card__header">
-				<h1>Available Access Points</h1>
+				<header>
+					<h1>Available Access Points</h1>
+				</header>
 			</div>
 			<div class="card__content">
 				<h2>Manual connect</h2>
 				<input type="button" class="button-manual-ssid" onclick="handleSelectSSID()" value="ADD (HIDDEN) SSID"/>
 				<h2>or choose a network...</h2>
-				<section id="wifi-list">
-					<div class="ape"><div class="w1"><div class="pw">DAP-1</div></div></div>
-				</section>
+				<section id="wifi-list"></section>
 				<div><em>Powered by </em><a id="acredits" href="#"><strong>esp8266-wifi-manager</strong></a>.</div>
 			</div>
 		</div>
 
 		<div id="wifi_setup">
 			<div class="card__header">
-				<h1>WiFi Security Setup</h1>
+				<header>
+					<h1>WiFi Security Setup</h1>
+				</header>
 			</div>
 			<div class="card__content">					
 				<div class="group">
@@ -96,7 +99,9 @@
 
 		<div id="ipv4_setup">
 			<div class="card__header">
-				<h1>IpV4 Settings</h1>
+				<header>
+					<h1>IpV4 Settings</h1>
+				</header>
 			</div>
 			<div class="card__content">
 				<div class="group">
@@ -146,7 +151,9 @@
 
 		<div id="server_setup">
 			<div class="card__header">
-				<h1>HTTP Client Settings</h1>
+				<header>
+					<h1>HTTP Client Settings</h1>
+				</header>
 			</div>
 			<div class="card__content">
 				<div class="group">
@@ -196,7 +203,7 @@
 				<div id="server_auth_tls">
 					<div class="group mt-10">
 						<label class="group__label">CA certificate</label>
-						<input id="server_ca" class="input__file" type="file" value="" accept=".pem,.crt" oninput="checkFormHttpClient()">
+						<input id="client_ca" class="input__file" type="file" value="" accept=".pem,.crt" oninput="checkFormHttpClient()">
 					</div>
 					<div class="group mt-10">
 						<label class="group__label">User certificate</label>
@@ -215,5 +222,39 @@
 			<button id="next" class="navigation-btn navigation-btn-next" onclick="handleNextClick()">Next</button>
 		</div>
 
+		<div id="loading">
+			<div class="spinner"><div class="double-bounce1"></div><div class="double-bounce2"></div></div>
+			<p class="tctr">You may lose wifi access while the esp8266 recalibrates its radio. Please wait until your device automatically reconnects. This can take up to 30s.</p>
+		</div>
+
+		<div id="setup-fail">
+			<h3 class="rd">ESP8266 configuration failed</h3>
+			<p class="tctr">Please double-check wifi password if any and make sure the access point has good signal.</p>
+			<div class="navigation-bar">
+				<button id="goback" class="navigation-btn" onclick="handleGoBackClick()">Go Back</button>
+				<button id="cancel" class="navigation-btn" onclick="handleCancelClick()">Cancel</button>
+			</div>
+		</div>
+
+		<div id="credits">
+			<header>
+				<h1>About this app...</h1>
+			</header>
+			<section>
+				<p><strong>esp8266-wifi-manager</strong>, &copy; 2023, Viktar Vasiuk<br />Licended under the MIT License.</p>
+				<p>
+					This app would not be possible without the following libraries:
+				</p>
+				<ul>
+					<li>SpinKit, &copy;  2015, Tobias Ahlin. Licensed under the MIT License.</li>
+					<li>jQuery, The jQuery Foundation. Licensed under the MIT License.</li>
+					<li>cJSON, &copy; 2009-2017, Dave Gamble and cJSON contributors. Licensed under the MIT License.</li>
+				</ul>
+			</section>
+			<div class="credits-bar">
+				<input id="ok-credits" type="button" value="OK" class="credits-btn" />
+			</div>
+		</div>		
+		</div>
 	</body>
 <html>

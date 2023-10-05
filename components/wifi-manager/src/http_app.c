@@ -1,3 +1,4 @@
+#include <sys/param.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -7,11 +8,12 @@
 #include <esp_log.h>
 #include <esp_system.h>
 #include "esp_netif.h"
+#include <esp_vfs.h>
 #include <esp_http_server.h>
+#include <cJSON.h>
 
 #include "manager.h"
 #include "http_app.h"
-
 
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "http_app";
@@ -29,9 +31,17 @@ static char* http_redirect_url = NULL;
 static char* http_js_url = NULL;
 static char* http_css_url = NULL;
 static char* http_favicon_url = NULL;
-static char* http_connect_url = NULL;
 static char* http_ap_url = NULL;
-static char* http_status_url = NULL;
+static char* http_connect_url = NULL;
+static char* http_http_url = NULL;
+static char* http_ipv4_url = NULL;
+static char* http_wifi_url = NULL;
+static char* http_client_ca_url = NULL;
+static char* http_client_crt_url = NULL;
+static char* http_client_key_url = NULL;
+static char* http_wifi_ca_url = NULL;
+static char* http_wifi_crt_url = NULL;
+static char* http_wifi_key_url = NULL;
 
 /**
  * @brief embedded binary data.
@@ -51,7 +61,7 @@ extern const uint8_t code_js_end[] asm("_binary_code_js_end");
 /* const httpd related values stored in ROM */
 const static char http_200_hdr[] = "200 OK";
 const static char http_302_hdr[] = "302 Found";
-const static char http_400_hdr[] = "400 Bad Request";
+// const static char http_400_hdr[] = "400 Bad Request";
 const static char http_404_hdr[] = "404 Not Found";
 const static char http_503_hdr[] = "503 Service Unavailable";
 const static char http_location_hdr[] = "Location";
@@ -66,6 +76,37 @@ const static char http_pragma_hdr[] = "Pragma";
 const static char http_pragma_no_cache[] = "no-cache";
 
 
+static esp_err_t get_request_buffer(httpd_req_t *req, char* result){
+	char buf[100];
+	int ret, remaining = req->content_len;
+	int end = 0;
+	if (remaining >= SCRATCH_BUFSIZE) {
+			/* Respond with 500 Internal Server Error */
+			ESP_LOGE(TAG, "Content too long");
+			httpd_resp_send_500(req);
+			return ESP_FAIL;
+	}
+	while (remaining > 0) {
+			/* Read the data for the request */
+			if ((ret = httpd_req_recv(req, buf,
+											MIN(remaining, sizeof(buf)))) <= 0) {
+					if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+							/* Retry receiving if timeout occurred */
+							continue;
+					}
+					return ESP_FAIL;
+			}
+
+			/* Send back the same data */
+			httpd_resp_send_chunk(req, buf, ret);
+			remaining -= ret;
+			memcpy(result, buf, ret);
+			result += ret;
+			end = ret;
+	}
+	result[end] = '\0';
+	return ESP_OK;
+}
 
 esp_err_t http_app_set_handler_hook( httpd_method_t method,  esp_err_t (*handler)(httpd_req_t *r)  ){
 
@@ -80,86 +121,162 @@ esp_err_t http_app_set_handler_hook( httpd_method_t method,  esp_err_t (*handler
 	else{
 		return ESP_ERR_INVALID_ARG;
 	}
-
 }
-
-
-static esp_err_t http_server_delete_handler(httpd_req_t *req){
-
-	ESP_LOGI(TAG, "DELETE %s", req->uri);
-
-	/* DELETE /connect.json */
-	if(strcmp(req->uri, http_connect_url) == 0){
-		wifi_manager_disconnect_async();
-
-		httpd_resp_set_status(req, http_200_hdr);
-		httpd_resp_set_type(req, http_content_type_json);
-		httpd_resp_set_hdr(req, http_cache_control_hdr, http_cache_control_no_cache);
-		httpd_resp_set_hdr(req, http_pragma_hdr, http_pragma_no_cache);
-		httpd_resp_send(req, NULL, 0);
-	}
-	else{
-		httpd_resp_set_status(req, http_404_hdr);
-		httpd_resp_send(req, NULL, 0);
-	}
-
-	return ESP_OK;
-}
-
 
 static esp_err_t http_server_post_handler(httpd_req_t *req){
-
-
 	esp_err_t ret = ESP_OK;
 
 	ESP_LOGI(TAG, "POST %s", req->uri);
 
-	/* POST /connect.json */
-	if(strcmp(req->uri, http_connect_url) == 0){
-
-
-		/* buffers for the headers */
-		size_t ssid_len = 0, password_len = 0;
-		char *ssid = NULL, *password = NULL;
-
-		/* len of values provided */
-		ssid_len = httpd_req_get_hdr_value_len(req, "X-Custom-ssid");
-		password_len = httpd_req_get_hdr_value_len(req, "X-Custom-pwd");
-
-
-		if(ssid_len && ssid_len <= MAX_SSID_SIZE && password_len && password_len <= MAX_PASSWORD_SIZE){
-
-			/* get the actual value of the headers */
-			ssid = malloc(sizeof(char) * (ssid_len + 1));
-			password = malloc(sizeof(char) * (password_len + 1));
-			httpd_req_get_hdr_value_str(req, "X-Custom-ssid", ssid, ssid_len+1);
-			httpd_req_get_hdr_value_str(req, "X-Custom-pwd", password, password_len+1);
-
-			wifi_config_t* config = wifi_manager_get_wifi_sta_config();
-			memset(config, 0x00, sizeof(wifi_config_t));
-			memcpy(config->sta.ssid, ssid, ssid_len);
-			memcpy(config->sta.password, password, password_len);
-			ESP_LOGI(TAG, "ssid: %s, password: %s", ssid, password);
-			ESP_LOGD(TAG, "http_server_post_handler: wifi_manager_connect_async() call");
-			wifi_manager_connect_async();
-
-			/* free memory */
-			free(ssid);
-			free(password);
-
-			httpd_resp_set_status(req, http_200_hdr);
-			httpd_resp_set_type(req, http_content_type_json);
-			httpd_resp_set_hdr(req, http_cache_control_hdr, http_cache_control_no_cache);
-			httpd_resp_set_hdr(req, http_pragma_hdr, http_pragma_no_cache);
-			httpd_resp_send(req, NULL, 0);
-
+	char *context = calloc(1, SCRATCH_BUFSIZE);
+	if(!context) {
+		ESP_LOGE(TAG, "No memory for context");
+		return ret;
+	}
+	
+	/* POST /client_ca.json */
+	if(strcmp(req->uri, http_client_ca_url) == 0){
+		ret = get_request_buffer(req, context);
+		if(ret != ESP_OK) {
+			httpd_resp_send_500(req);
+		} else {
+			ret = wifi_manager_save_http_ca(context);
+			if( ret != ESP_OK ){
+					ESP_LOGE(TAG, "File write error: %s", esp_err_to_name(ret));
+					httpd_resp_send_500(req);
+			}else {			
+				httpd_resp_set_status(req, http_200_hdr);
+				httpd_resp_send(req, NULL, 0);
+			}
 		}
-		else{
-			/* bad request the authentification header is not complete/not the correct format */
-			httpd_resp_set_status(req, http_400_hdr);
-			httpd_resp_send(req, NULL, 0);
+	}
+	/* POST /client_crt.json */
+	if(strcmp(req->uri, http_client_crt_url) == 0){
+		ret = get_request_buffer(req, context);
+		if(ret != ESP_OK) {
+			httpd_resp_send_500(req);
+		} else {
+			ret = wifi_manager_save_http_crt(context);
+			if( ret != ESP_OK ){
+					ESP_LOGE(TAG, "File write error: %s", esp_err_to_name(ret));
+					httpd_resp_send_500(req);
+			}else {			
+				httpd_resp_set_status(req, http_200_hdr);
+				httpd_resp_send(req, NULL, 0);
+			}
 		}
-
+	}
+	/* POST /client_key.json */
+	if(strcmp(req->uri, http_client_key_url) == 0){
+		ret = get_request_buffer(req, context);
+		if(ret != ESP_OK) {
+			httpd_resp_send_500(req);
+		} else {
+			ret = wifi_manager_save_http_key(context);
+			if( ret != ESP_OK ){
+					ESP_LOGE(TAG, "File write error: %s", esp_err_to_name(ret));
+					httpd_resp_send_500(req);
+			}else {			
+				httpd_resp_set_status(req, http_200_hdr);
+				httpd_resp_send(req, NULL, 0);
+			}
+		}
+	}
+	/* POST /wifi_ca.json */
+	if(strcmp(req->uri, http_wifi_ca_url) == 0){
+		ret = get_request_buffer(req, context);
+		if(ret != ESP_OK) {
+			httpd_resp_send_500(req);
+		} else {
+			ret = wifi_manager_save_wifi_ca(context);
+			if( ret != ESP_OK ){
+					ESP_LOGE(TAG, "File write error: %s", esp_err_to_name(ret));
+					httpd_resp_send_500(req);
+			}else {			
+				httpd_resp_set_status(req, http_200_hdr);
+				httpd_resp_send(req, NULL, 0);
+			}
+		}
+	}
+	/* POST /wifi_crt.json */
+	if(strcmp(req->uri, http_wifi_crt_url) == 0){
+		ret = get_request_buffer(req, context);
+		if(ret != ESP_OK) {
+			httpd_resp_send_500(req);
+		} else {
+			ret = wifi_manager_save_wifi_crt(context);
+			if( ret != ESP_OK ){
+					ESP_LOGE(TAG, "File write error: %s", esp_err_to_name(ret));
+					httpd_resp_send_500(req);
+			}else {			
+				httpd_resp_set_status(req, http_200_hdr);
+				httpd_resp_send(req, NULL, 0);
+			}
+		}
+	}
+	/* POST /wifi_key.json */
+	if(strcmp(req->uri, http_wifi_key_url) == 0){
+		ret = get_request_buffer(req, context);
+		if(ret != ESP_OK) {
+			httpd_resp_send_500(req);
+		} else {
+			ret = wifi_manager_save_wifi_key(context);
+			if( ret != ESP_OK ){
+					ESP_LOGE(TAG, "File write error: %s", esp_err_to_name(ret));
+					httpd_resp_send_500(req);
+			}else {			
+				httpd_resp_set_status(req, http_200_hdr);
+				httpd_resp_send(req, NULL, 0);
+			}
+		}
+	}
+	/* POST /http_setup.json */
+	else if(strcmp(req->uri, http_http_url) == 0) {
+		ret = get_request_buffer(req, context);
+		if(ret != ESP_OK) {
+			httpd_resp_send_500(req);
+		} else {
+			ret = wifi_manager_save_http_config(context);
+			if( ret != ESP_OK ){
+					ESP_LOGE(TAG, "File write error: %s", esp_err_to_name(ret));
+					httpd_resp_send_500(req);
+			}else {			
+				httpd_resp_set_status(req, http_200_hdr);
+				httpd_resp_send(req, NULL, 0);
+			}
+		}
+	}
+	/* POST /ipv4_setup.json */
+	else if(strcmp(req->uri, http_ipv4_url) == 0) {
+		ret = get_request_buffer(req, context);
+		if(ret != ESP_OK) {
+			httpd_resp_send_500(req);
+		} else {
+			ret = wifi_manager_save_ipv4_config(context);
+			if( ret != ESP_OK ){
+					ESP_LOGE(TAG, "File write error: %s", esp_err_to_name(ret));
+					httpd_resp_send_500(req);
+			}else {			
+				httpd_resp_set_status(req, http_200_hdr);
+				httpd_resp_send(req, NULL, 0);
+			}
+		}
+	}
+	/* POST /wifi_setup.json */
+	else if(strcmp(req->uri, http_wifi_url) == 0) {
+		ret = get_request_buffer(req, context);
+		if(ret != ESP_OK) {
+			httpd_resp_send_500(req);
+		} else {
+			ret = wifi_manager_save_wifi_config(context);
+			if( ret != ESP_OK ){
+					ESP_LOGE(TAG, "File write error: %s", esp_err_to_name(ret));
+					httpd_resp_send_500(req);
+			}else {		
+				httpd_resp_set_status(req, http_200_hdr);
+				httpd_resp_send(req, NULL, 0);
+			}
+		}
 	}
 	else{
 
@@ -173,7 +290,7 @@ static esp_err_t http_server_post_handler(httpd_req_t *req){
 			ret = (*custom_post_httpd_uri_handler)(req);
 		}
 	}
-
+	free(context);
 	return ret;
 }
 
@@ -262,41 +379,11 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
 			/* request a wifi scan */
 			wifi_manager_scan_async();
 		}
-		/* GET /status.json */
-		else if(strcmp(req->uri, http_status_url) == 0){
-
-			if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
-				char *buff = wifi_manager_get_ip_info_json();
-				if(buff){
-					httpd_resp_set_status(req, http_200_hdr);
-					httpd_resp_set_type(req, http_content_type_json);
-					httpd_resp_set_hdr(req, http_cache_control_hdr, http_cache_control_no_cache);
-					httpd_resp_set_hdr(req, http_pragma_hdr, http_pragma_no_cache);
-					httpd_resp_send(req, buff, strlen(buff));
-					wifi_manager_unlock_json_buffer();
-				}
-				else{
-					httpd_resp_set_status(req, http_503_hdr);
-					httpd_resp_send(req, NULL, 0);
-				}
-			}
-			else{
-				httpd_resp_set_status(req, http_503_hdr);
-				httpd_resp_send(req, NULL, 0);
-				ESP_LOGE(TAG, "http_server_netconn_serve: GET /status.json failed to obtain mutex");
-			}
-		}
-		else{
-
-			if(custom_get_httpd_uri_handler == NULL){
-				httpd_resp_set_status(req, http_404_hdr);
-				httpd_resp_send(req, NULL, 0);
-			}
-			else{
-
-				/* if there's a hook, run it */
-				ret = (*custom_get_httpd_uri_handler)(req);
-			}
+		/* GET /connect */
+		else if(strcmp(req->uri, http_connect_url) == 0){
+			httpd_resp_set_status(req, http_200_hdr);
+			httpd_resp_send(req, NULL, 0);
+			wifi_manager_connect_async();
 		}
 
 	}
@@ -341,24 +428,74 @@ static const httpd_uri_t http_server_get_ap_request = {
     .handler   = http_server_get_handler
 };
 
-static const httpd_uri_t http_server_get_status_request = {
-    .uri       = "/status.json",
+static const httpd_uri_t http_server_get_connect_request = {
+    .uri       = "/connect",
     .method    = HTTP_GET,
     .handler   = http_server_get_handler
 };
 
-static const httpd_uri_t http_server_post_connect_request = {
-	.uri	= "/connect.json",
-	.method = HTTP_POST,
-	.handler = http_server_post_handler
+static const httpd_uri_t http_server_post_client_ca_request = {
+		.uri	= "/client_ca.json",
+		.method = HTTP_POST,
+		.handler = http_server_post_handler,
+		.user_ctx = NULL
 };
 
-static const httpd_uri_t http_server_delete_request = {
-	.uri	= "/",
-	.method = HTTP_DELETE,
-	.handler = http_server_delete_handler
+static const httpd_uri_t http_server_post_client_crt_request = {
+		.uri	= "/client_crt.json",
+		.method = HTTP_POST,
+		.handler = http_server_post_handler,
+		.user_ctx = NULL
 };
 
+static const httpd_uri_t http_server_post_client_key_request = {
+		.uri	= "/client_key.json",
+		.method = HTTP_POST,
+		.handler = http_server_post_handler,
+		.user_ctx = NULL
+};
+
+static const httpd_uri_t http_server_post_wifi_ca_request = {
+		.uri	= "/wifi_ca.json",
+		.method = HTTP_POST,
+		.handler = http_server_post_handler,
+		.user_ctx = NULL
+};
+
+static const httpd_uri_t http_server_post_wifi_crt_request = {
+		.uri	= "/wifi_crt.json",
+		.method = HTTP_POST,
+		.handler = http_server_post_handler,
+		.user_ctx = NULL
+};
+
+static const httpd_uri_t http_server_post_wifi_key_request = {
+		.uri	= "/wifi_key.json",
+		.method = HTTP_POST,
+		.handler = http_server_post_handler,
+		.user_ctx = NULL
+};
+
+static const httpd_uri_t http_server_post_http_request = {
+		.uri	= "/http_setup.json",
+		.method = HTTP_POST,
+		.handler = http_server_post_handler,
+		.user_ctx = NULL
+};					
+
+static const httpd_uri_t http_server_post_ipv4_request = {
+		.uri	= "/ipv4_setup.json",
+		.method = HTTP_POST,
+		.handler = http_server_post_handler,
+		.user_ctx = NULL
+};					
+
+static const httpd_uri_t http_server_post_wifi_request = {
+		.uri	= "/wifi_setup.json",
+		.method = HTTP_POST,
+		.handler = http_server_post_handler,
+		.user_ctx = NULL
+};					
 
 void http_app_stop(){
 
@@ -386,17 +523,49 @@ void http_app_stop(){
 			free(http_css_url);
 			http_css_url = NULL;
 		}
-		if(http_connect_url){
-			free(http_connect_url);
-			http_connect_url = NULL;
-		}
 		if(http_ap_url){
 			free(http_ap_url);
 			http_ap_url = NULL;
 		}
-		if(http_status_url){
-			free(http_status_url);
-			http_status_url = NULL;
+		if(http_connect_url){
+			free(http_connect_url);
+			http_connect_url = NULL;
+		}
+		if(http_http_url){
+			free(http_http_url);
+			http_http_url = NULL;
+		}
+		if(http_ipv4_url){
+			free(http_ipv4_url);
+			http_ipv4_url = NULL;
+		}
+		if(http_wifi_url){
+			free(http_wifi_url);
+			http_wifi_url = NULL;
+		}
+		if(http_client_ca_url){
+			free(http_client_ca_url);
+			http_client_ca_url = NULL;
+		}
+		if(http_client_crt_url){
+			free(http_client_crt_url);
+			http_client_crt_url = NULL;
+		}
+		if(http_client_key_url){
+			free(http_client_key_url);
+			http_client_key_url = NULL;
+		}
+		if(http_wifi_ca_url){
+			free(http_wifi_ca_url);
+			http_wifi_ca_url = NULL;
+		}
+		if(http_wifi_crt_url){
+			free(http_wifi_crt_url);
+			http_wifi_crt_url = NULL;
+		}
+		if(http_wifi_key_url){
+			free(http_wifi_key_url);
+			http_wifi_key_url = NULL;
 		}
 
 		/* stop server */
@@ -432,6 +601,7 @@ void http_app_start(bool lru_purge_enable){
 
 		httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
+		config.max_uri_handlers = 15;
 		config.lru_purge_enable = lru_purge_enable;
 
 		/* generate the URLs */
@@ -442,9 +612,17 @@ void http_app_start(bool lru_purge_enable){
 			const char page_js[] = "code.js";
 			const char page_css[] = "style.css";
 			const char page_ico[] = "favicon.ico";
-			const char page_connect[] = "connect.json";
 			const char page_ap[] = "ap.json";
-			const char page_status[] = "status.json";
+			const char page_connect[] = "connect";
+			const char page_http[] = "http_setup.json";
+			const char page_ipv4[] = "ipv4_setup.json";
+			const char page_wifi[] = "wifi_setup.json";
+			const char page_client_ca[] = "client_ca.json";
+			const char page_client_crt[] = "client_crt.json";
+			const char page_client_key[] = "client_key.json";
+			const char page_wifi_ca[] = "wifi_ca.json";
+			const char page_wifi_crt[] = "wifi_crt.json";
+			const char page_wifi_key[] = "wifi_key.json";
 
 			/* root url, eg "/"   */
 			const size_t http_root_url_sz = sizeof(char) * (root_len+1);
@@ -470,10 +648,17 @@ void http_app_start(bool lru_purge_enable){
 			http_js_url = http_app_generate_url(page_js);
 			http_favicon_url = http_app_generate_url(page_ico);
 			http_css_url = http_app_generate_url(page_css);
-			http_connect_url = http_app_generate_url(page_connect);
 			http_ap_url = http_app_generate_url(page_ap);
-			http_status_url = http_app_generate_url(page_status);
-
+			http_connect_url = http_app_generate_url(page_connect);
+			http_http_url = http_app_generate_url(page_http);
+			http_ipv4_url = http_app_generate_url(page_ipv4);
+			http_wifi_url = http_app_generate_url(page_wifi);
+			http_client_ca_url = http_app_generate_url(page_client_ca);
+			http_client_crt_url = http_app_generate_url(page_client_crt);
+			http_client_key_url = http_app_generate_url(page_client_key);
+			http_wifi_ca_url = http_app_generate_url(page_wifi_ca);
+			http_wifi_crt_url = http_app_generate_url(page_wifi_crt);
+			http_wifi_key_url = http_app_generate_url(page_wifi_key);
 		}
 
 		err = httpd_start(&httpd_handle, &config);
@@ -485,10 +670,16 @@ void http_app_start(bool lru_purge_enable){
 	        httpd_register_uri_handler(httpd_handle, &http_server_get_style_request);
 	        httpd_register_uri_handler(httpd_handle, &http_server_get_code_request);
 	        httpd_register_uri_handler(httpd_handle, &http_server_get_ap_request);
-	        httpd_register_uri_handler(httpd_handle, &http_server_get_status_request);
-	        httpd_register_uri_handler(httpd_handle, &http_server_post_connect_request);
-	        httpd_register_uri_handler(httpd_handle, &http_server_delete_request);
+	        httpd_register_uri_handler(httpd_handle, &http_server_get_connect_request);
+	        httpd_register_uri_handler(httpd_handle, &http_server_post_client_ca_request);
+	        httpd_register_uri_handler(httpd_handle, &http_server_post_client_crt_request);
+	        httpd_register_uri_handler(httpd_handle, &http_server_post_client_key_request);
+	        httpd_register_uri_handler(httpd_handle, &http_server_post_wifi_ca_request);
+	        httpd_register_uri_handler(httpd_handle, &http_server_post_wifi_crt_request);
+	        httpd_register_uri_handler(httpd_handle, &http_server_post_wifi_key_request);
+	        httpd_register_uri_handler(httpd_handle, &http_server_post_http_request);
+	        httpd_register_uri_handler(httpd_handle, &http_server_post_ipv4_request);
+	        httpd_register_uri_handler(httpd_handle, &http_server_post_wifi_request);
 	    }
 	}
-
 }

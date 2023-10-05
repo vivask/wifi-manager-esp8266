@@ -1,9 +1,3 @@
-body {
-    background-color: #eee;
-    border: 0;
-    margin: 0;
-    font: 1.1em tahoma, arial, sans-serif;
-}
 a {
     color: darkblue;
     transition: color .2s ease-out;

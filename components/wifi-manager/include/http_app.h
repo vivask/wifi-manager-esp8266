@@ -1,12 +1,15 @@
 #pragma once
 
 #include <stdbool.h>
+#include <esp_err.h>
 #include <esp_http_server.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#define FILE_PATH_MAX (ESP_VFS_PATH_MAX + 128)
+#define SCRATCH_BUFSIZE (10240)
 
 /** @brief Defines the URL where the wifi manager is located
  *  By default it is at the server root (ie "/"). If you wish to add your own webpages

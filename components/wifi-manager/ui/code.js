@@ -171,7 +171,7 @@ function checkFormHttpClient() {
     if(gel("client_password").value.length === 0) return;
   }
   if(gel("server_auth").value === "tls"){
-    if(gel("server_ca").value.length === 0) return;
+    if(gel("client_ca").value.length === 0) return;
     if(gel("client_crt").value.length === 0) return;
     if(gel("client_key").value.length === 0) return;
   }
@@ -197,10 +197,8 @@ function handleNextClick() {
       handleUseStmKey(gel("cb-stm").checked);
       handleServerAuthChange(gel("server_auth").value)
       break;
-    case "server_setup":
-      selectedForm = "ap_select";
-      show("ap_select");
-      hide("server_setup");
+    case "server_setup":      
+      createSetup()
       break;
   }
 }
@@ -229,7 +227,6 @@ function handleBackClick() {
 
 /* Refresh access points api */
 var refreshAPInterval = null;
-var checkStatusInterval = null;
 
 function docReady(fn) {
   // see if DOM is already available
@@ -244,10 +241,6 @@ function docReady(fn) {
   }
 }
 
-function startCheckStatusInterval() {
-  checkStatusInterval = setInterval(checkStatus, 950);
-}
-
 function startRefreshAPInterval() {
   refreshAPInterval = setInterval(refreshAP, 3800);
 }
@@ -256,13 +249,6 @@ function stopRefreshAPInterval() {
   if (refreshAPInterval != null) {
       clearInterval(refreshAPInterval);
       refreshAPInterval = null;
-  }
-}
-
-function stopCheckStatusInterval() {
-  if (checkStatusInterval != null) {
-      clearInterval(checkStatusInterval);
-      checkStatusInterval = null;
   }
 }
 
@@ -276,9 +262,27 @@ docReady(async function () {
     false
   );
 
+  gel("ok-credits").addEventListener(
+    "click",
+    () => {
+      hide("credits");
+      show("ap_select");
+    },
+    false
+  );
+
+  gel("acredits").addEventListener(
+    "click",
+    () => {
+      event.preventDefault();
+      show("credits");
+      hide("ap_select");
+    },
+    false
+);
+
   //first time the page loads: attempt get the connection status and start the wifi scan
   await refreshAP();
-  startCheckStatusInterval();
   startRefreshAPInterval();
 });
 
@@ -324,5 +328,137 @@ function rssiToIcon(rssi) {
   }
 }
 
-async function checkStatus(url = "status.json") {
+async function createSetup() {
+  hide("server_setup");
+  hide("navigation");
+  show("loading");
+
+  for (const [key, value] of Object.entries(GetCertificates())) {
+    const reader = new FileReader();
+    const file = gel(value).files[0];
+    if(file) {
+      reader.readAsText(file);
+      reader.onerror = function () {
+        console.log("File read error");
+      };
+      reader.onload = async () => {
+        const url = `${key}.json`;
+        let response = await fetch(url, {
+          method: "POST",
+          headers: {
+            'Content-Type': 'application/json;charset=utf-8'
+          },
+          body: reader.result
+        });
+        if(!response.ok) {
+          console.log('cert '`${key}' fail'`);
+          hide("loading");
+          show("setup-fail");
+          return;
+        } 
+      };
+    }
+  }
+
+  const setups = {
+    "http_setup.json": GetHttpSetup(),
+    "ipv4_setup.json": GetIpv4Setup(),
+    "wifi_setup.json": GetWifiSetup(),
+  }
+
+  for (const [key, value] of Object.entries(setups)) {
+    // console.log({[key]: value});
+    let response = await fetch(key, {
+      method: "POST",
+      headers: {
+        'Content-Type': 'application/json;charset=utf-8'
+      },
+      body: JSON.stringify(value)
+    });
+    if(!response.ok) {
+      console.log(`${key}' fail'`);
+      hide("loading");
+      show("setup-fail");
+      return;
+    } 
+  }
+
+  let response = await fetch("connect");
+  if(!response.ok) {
+    console.log(`${key}' fail'`);
+    hide("loading");
+    show("setup-fail");
+    return;
+  } 
+
+
+  selectedForm = "ap_select";
+  hide("loading");
+  show("ap_select");
+}
+
+function GetHttpSetup() {
+  return {
+    server_address: gel("server_address").value,
+    server_port: gel("server_port").value,
+    server_api: gel("server_api").value,
+    esp_json_key: gel("esp_json_key").value,
+    stm_json_key: gel("stm_json_key").value,
+    server_auth: gel("server_auth").value,
+    client_username: gel("client_username").value,
+    client_password: gel("client_password").value,
+  }
+}
+
+function GetIpv4Setup() {
+  return {
+    ipv4_method: gel("ipv4_method").value,
+    ipv4_address: gel("ipv4_address").value,
+    ipv4_mask: gel("ipv4_mask").value,
+    ipv4_gate: gel("ipv4_gate").value,
+    ipv4_dns1: gel("ipv4_dns1").value,
+    ipv4_dns2: gel("ipv4_dns2").value,
+    ipv4_zone: gel("ipv4_zone").value,
+    ipv4_ntp: gel("ipv4_ntp").value,
+  }
+}
+
+function GetWifiSetup() {
+  return {
+    wifi_ssid: gel("wifi_ssid").value,
+    wifi_wpa: gel("wifi_wpa").value,
+    wifi_auth: gel("wifi_auth").value,
+    wifi_identity: gel("wifi_identity").value,
+    wifi_username: gel("wifi_username").value,
+    wifi_password: gel("wifi_password").value,
+  }
+}
+
+function GetCertificates() {
+  return {
+    client_ca: "client_ca",
+    client_crt: "client_crt",
+    client_key: "client_key",
+    wifi_ca: (gel("wifi_auth").value === "tls") ? "wifi_tls_ca" : "wifi_ca",
+    wifi_crt: "wifi_crt",
+    wifi_key: "wifi_key",
+  }
+}
+
+function handleGoBackClick() {
+  hide("setup-fail");
+  gel("navigation").style.display = "flex";
+  selectedForm = "server_setup";
+  show("server_setup");
+  gel("next").innerText = "Finish"
+  handleUseEspKey(gel("cb-esp").checked);
+  handleUseStmKey(gel("cb-stm").checked);
+  handleServerAuthChange(gel("server_auth").value)
+}
+
+function handleCancelClick() {
+  selectedForm = "ap_select";
+  gel("next").innerText = "Next"
+  hide("setup-fail");
+  show("ap_select");
 }
