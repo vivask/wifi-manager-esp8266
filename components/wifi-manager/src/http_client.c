@@ -18,8 +18,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
    ----------------------------------------------------------------------
 
-@see https://github.com/vivask/esp32-wifi-manager
+@see https://github.com/vivask/esp8266-wifi-manager
 */
+#include <sys/param.h>
 #include <string.h>
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
@@ -43,8 +44,6 @@
 #define DEFAULT_CACHE_SIZE      CONFIG_HTTP_CLIENT_TASK_CACHE_SIZE
 #define MAX_HTTP_URL_SIZE       CONFIG_HTTP_CLIENT_MAX_URL_LEN
 #define MAX_HTTP_OUTPUT_BUFFER  CONFIG_HTTP_CLIENT_MAX_RESPONSE_LEN
-
-#define MIN(a,b) (((a)<(b))?(a):(b))
 
 static const char *TAG = "http_client";
 

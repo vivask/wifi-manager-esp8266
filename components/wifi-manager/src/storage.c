@@ -18,7 +18,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
    ----------------------------------------------------------------------
 
-@see https://github.com/vivask/wifi-manager
+@see https://github.com/vivask/esp8266-wifi-manager
 */
 #include <stdlib.h>
 #include <stdio.h>
@@ -73,7 +73,6 @@ static void wifi_json_string_to_config(esp8266_config_t* config, const char* wif
 	config->wifi_username = copy_json_item(wifi_json, "wifi_username");
 	config->wifi_password = copy_json_item(wifi_json, "wifi_password");
 	config->wifi_auth = copy_json_item(wifi_json, "wifi_auth");
-	config->wifi_inner = copy_json_item(wifi_json, "wifi_inner");
 	cJSON_Delete(wifi_json);
 }
 
@@ -113,7 +112,8 @@ static void http_json_string_to_config(esp8266_config_t* config, const char* htt
 	config->server_address = copy_json_item(http_json, "server_address");
 	config->server_port = cJSON_GetObjectItem(http_json, "server_port")->valueint;
 	config->server_api = copy_json_item(http_json, "server_api");
-	config->ota_api = copy_json_item(http_json, "ota_api");
+	config->esp_json_key = copy_json_item(http_json, "esp_json_key");
+	config->stm_json_key = copy_json_item(http_json, "stm_json_key");
 	config->server_auth = copy_json_item(http_json, "server_auth");
 	config->client_username = copy_json_item(http_json, "client_username");
 	config->client_password = copy_json_item(http_json, "client_password");

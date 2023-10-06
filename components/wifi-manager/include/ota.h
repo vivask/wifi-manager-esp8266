@@ -18,7 +18,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
    ----------------------------------------------------------------------
 
-@see https://github.com/vivask/wifi-manager
+@see https://github.com/vivask/esp8266-wifi-manager
 */
 #pragma once
 

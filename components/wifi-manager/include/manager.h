@@ -21,7 +21,7 @@
    ----------------------------------------------------------------------
 
 @see https://github.com/tonyp7/esp32-wifi-manager
-@see https://github.com/vivask/wifi-manager
+@see https://github.com/vivask/esp8266-wifi-manager
  */
 #pragma once
 

@@ -1,3 +1,28 @@
+/**
+ * original author:  Tony Pottier
+ * modification: 	 Viktar Vasiuk
+
+   ----------------------------------------------------------------------
+    Copyright (C) Viktar Vasiuk, 2023
+   	Copyright (C) Tony Pottier, 2007
+    
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    any later version.
+     
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+    
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   ----------------------------------------------------------------------
+
+@see https://github.com/tonyp7/esp32-wifi-manager
+@see https://github.com/vivask/esp8266-wifi-manager
+ */
 #include <sys/param.h>
 #include <stdio.h>
 #include <string.h>
@@ -24,6 +49,9 @@ static httpd_handle_t httpd_handle = NULL;
 /* function pointers to URI handlers that can be user made */
 esp_err_t (*custom_get_httpd_uri_handler)(httpd_req_t *r) = NULL;
 esp_err_t (*custom_post_httpd_uri_handler)(httpd_req_t *r) = NULL;
+
+/* POST response context buffer*/
+static char* context=NULL;
 
 /* strings holding the URLs of the wifi manager */
 static char* http_root_url = NULL;
@@ -128,12 +156,6 @@ static esp_err_t http_server_post_handler(httpd_req_t *req){
 
 	ESP_LOGI(TAG, "POST %s", req->uri);
 
-	char *context = calloc(1, SCRATCH_BUFSIZE);
-	if(!context) {
-		ESP_LOGE(TAG, "No memory for context");
-		return ret;
-	}
-	
 	/* POST /client_ca.json */
 	if(strcmp(req->uri, http_client_ca_url) == 0){
 		ret = get_request_buffer(req, context);
@@ -290,7 +312,6 @@ static esp_err_t http_server_post_handler(httpd_req_t *req){
 			ret = (*custom_post_httpd_uri_handler)(req);
 		}
 	}
-	free(context);
 	return ret;
 }
 
@@ -383,6 +404,7 @@ static esp_err_t http_server_get_handler(httpd_req_t *req){
 		else if(strcmp(req->uri, http_connect_url) == 0){
 			httpd_resp_set_status(req, http_200_hdr);
 			httpd_resp_send(req, NULL, 0);
+			ESP_LOGI(TAG, "CONNECT...");
 			wifi_manager_connect_async();
 		}
 
@@ -435,63 +457,63 @@ static const httpd_uri_t http_server_get_connect_request = {
 };
 
 static const httpd_uri_t http_server_post_client_ca_request = {
-		.uri	= "/client_ca.json",
+		.uri	= "/client_ca",
 		.method = HTTP_POST,
 		.handler = http_server_post_handler,
 		.user_ctx = NULL
 };
 
 static const httpd_uri_t http_server_post_client_crt_request = {
-		.uri	= "/client_crt.json",
+		.uri	= "/client_crt",
 		.method = HTTP_POST,
 		.handler = http_server_post_handler,
 		.user_ctx = NULL
 };
 
 static const httpd_uri_t http_server_post_client_key_request = {
-		.uri	= "/client_key.json",
+		.uri	= "/client_key",
 		.method = HTTP_POST,
 		.handler = http_server_post_handler,
 		.user_ctx = NULL
 };
 
 static const httpd_uri_t http_server_post_wifi_ca_request = {
-		.uri	= "/wifi_ca.json",
+		.uri	= "/wifi_ca",
 		.method = HTTP_POST,
 		.handler = http_server_post_handler,
 		.user_ctx = NULL
 };
 
 static const httpd_uri_t http_server_post_wifi_crt_request = {
-		.uri	= "/wifi_crt.json",
+		.uri	= "/wifi_crt",
 		.method = HTTP_POST,
 		.handler = http_server_post_handler,
 		.user_ctx = NULL
 };
 
 static const httpd_uri_t http_server_post_wifi_key_request = {
-		.uri	= "/wifi_key.json",
+		.uri	= "/wifi_key",
 		.method = HTTP_POST,
 		.handler = http_server_post_handler,
 		.user_ctx = NULL
 };
 
 static const httpd_uri_t http_server_post_http_request = {
-		.uri	= "/http_setup.json",
+		.uri	= "/http_setup",
 		.method = HTTP_POST,
 		.handler = http_server_post_handler,
 		.user_ctx = NULL
 };					
 
 static const httpd_uri_t http_server_post_ipv4_request = {
-		.uri	= "/ipv4_setup.json",
+		.uri	= "/ipv4_setup",
 		.method = HTTP_POST,
 		.handler = http_server_post_handler,
 		.user_ctx = NULL
 };					
 
 static const httpd_uri_t http_server_post_wifi_request = {
-		.uri	= "/wifi_setup.json",
+		.uri	= "/wifi_setup",
 		.method = HTTP_POST,
 		.handler = http_server_post_handler,
 		.user_ctx = NULL
@@ -501,6 +523,11 @@ void http_app_stop(){
 
 	if(httpd_handle != NULL){
 
+		/* dealoc context buffer*/
+		if(context) {
+			free(context);
+			context = NULL;
+		}
 
 		/* dealloc URLs */
 		if(http_root_url) {
@@ -599,6 +626,12 @@ void http_app_start(bool lru_purge_enable){
 
 	if(httpd_handle == NULL){
 
+		context = calloc(1, SCRATCH_BUFSIZE);
+		if(!context) {
+			ESP_LOGE(TAG, "No memory for context");
+			return;
+		}
+
 		httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
 		config.max_uri_handlers = 15;
@@ -614,15 +647,15 @@ void http_app_start(bool lru_purge_enable){
 			const char page_ico[] = "favicon.ico";
 			const char page_ap[] = "ap.json";
 			const char page_connect[] = "connect";
-			const char page_http[] = "http_setup.json";
-			const char page_ipv4[] = "ipv4_setup.json";
-			const char page_wifi[] = "wifi_setup.json";
-			const char page_client_ca[] = "client_ca.json";
-			const char page_client_crt[] = "client_crt.json";
-			const char page_client_key[] = "client_key.json";
-			const char page_wifi_ca[] = "wifi_ca.json";
-			const char page_wifi_crt[] = "wifi_crt.json";
-			const char page_wifi_key[] = "wifi_key.json";
+			const char page_http[] = "http_setup";
+			const char page_ipv4[] = "ipv4_setup";
+			const char page_wifi[] = "wifi_setup";
+			const char page_client_ca[] = "client_ca";
+			const char page_client_crt[] = "client_crt";
+			const char page_client_key[] = "client_key";
+			const char page_wifi_ca[] = "wifi_ca";
+			const char page_wifi_crt[] = "wifi_crt";
+			const char page_wifi_key[] = "wifi_key";
 
 			/* root url, eg "/"   */
 			const size_t http_root_url_sz = sizeof(char) * (root_len+1);

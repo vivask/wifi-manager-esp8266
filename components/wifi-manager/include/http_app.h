@@ -1,3 +1,28 @@
+/**
+ * original author:  Tony Pottier
+ * modification: 	 Viktar Vasiuk
+
+   ----------------------------------------------------------------------
+    Copyright (C) Viktar Vasiuk, 2023
+   	Copyright (C) Tony Pottier, 2007
+    
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    any later version.
+     
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+    
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   ----------------------------------------------------------------------
+
+@see https://github.com/tonyp7/esp32-wifi-manager
+@see https://github.com/vivask/esp8266-wifi-manager
+ */
 #pragma once
 
 #include <stdbool.h>
@@ -8,8 +33,8 @@
 extern "C" {
 #endif
 
-#define FILE_PATH_MAX (ESP_VFS_PATH_MAX + 128)
-#define SCRATCH_BUFSIZE (10240)
+// #define SCRATCH_BUFSIZE (10240)
+#define SCRATCH_BUFSIZE (4096)
 
 /** @brief Defines the URL where the wifi manager is located
  *  By default it is at the server root (ie "/"). If you wish to add your own webpages

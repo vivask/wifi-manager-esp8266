@@ -18,7 +18,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
    ----------------------------------------------------------------------
 
-@see https://github.com/vivask/wifi-manager
+@see https://github.com/vivask/esp8266-wifi-manager
 */
 #include <nvs_flash.h>
 #include <esp_vfs.h>
@@ -53,8 +53,7 @@ esp_err_t save_flash_json_data(const char* json, const char* fName) {
     if (f == NULL) {
         ESP_LOGE(TAG, "Failed to open file %s for writing", fName);
     }else{
-        //int wrote = fprintf(f, "%s", json);
-        int wrote = fwrite(json, strlen(json)*sizeof(char), 1, f);
+        int wrote = fwrite(json, strlen(json), 1, f);
         fclose(f);
         if (wrote == 0) {
             ESP_LOGE(TAG, "File: %s write error", fName);

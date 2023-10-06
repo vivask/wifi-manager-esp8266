@@ -18,7 +18,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
    ----------------------------------------------------------------------
 
-@see https://github.com/vivask/wifi-manager
+@see https://github.com/vivask/esp8266-wifi-manager
 */
 #pragma once
 
@@ -134,7 +134,6 @@ typedef struct _esp8266_config_t {
     char* wifi_username;
     char* wifi_password;
     char* wifi_auth;
-    char* wifi_inner;
     char* wifi_ca;
     char* wifi_crt;
     char* wifi_key;
@@ -155,7 +154,8 @@ typedef struct _esp8266_config_t {
     char* client_ca;
     char* client_crt;
     char* client_key;
-    char* ota_api;
+    char* esp_json_key;
+    char* stm_json_key;
 }esp8266_config_t;
 
 

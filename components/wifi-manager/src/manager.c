@@ -21,7 +21,7 @@
    ----------------------------------------------------------------------
 
 @see https://github.com/tonyp7/esp32-wifi-manager
-@see https://github.com/vivask/wifi-manager
+@see https://github.com/vivask/esp8266-wifi-manager
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,17 +48,15 @@
 #include <esp_http_server.h>
 #include <cJSON.h>
 
+#include "json.c"
 #include "flash.h"
 #include "dns_server.h"
-// #include "http_server.h"
 #include "http_app.h"
-// #include "httpd_simple.h"
 #include "ntp_client.h"
 #include "storage.h"
-#include "json.h"
 #include "manager.h"
 
-//#define SETUP_MODE
+// #define SETUP_MODE
 //#define DEBUG_MODE
 
 /* --- PRINTF_BYTE_TO_BINARY macro's --- */
@@ -269,41 +267,49 @@ void wifi_manager_clear_ip_info_json(){
 void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code, bool http_client_status) {
 	wifi_config_t *config = wifi_manager_get_wifi_sta_config();
 	if(config){
+
+		const char *ip_info_json_format = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"httpc\":%d}\n";
+
 		memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
-		cJSON *root = cJSON_CreateObject();
-		cJSON_AddStringToObject(root, "ssid", (char*)config->sta.ssid);
+
+		/* to avoid declaring a new buffer we copy the data directly into the buffer at its correct address */
+		strcpy(ip_info_json, "{\"ssid\":");
+		json_print_string(config->sta.ssid,  (unsigned char*)(ip_info_json+strlen(ip_info_json)) );
+
+		size_t ip_info_json_len = strlen(ip_info_json);
+		size_t remaining = JSON_IP_INFO_SIZE - ip_info_json_len;
 		if(update_reason_code == UPDATE_CONNECTION_OK){
 			/* rest of the information is copied after the ssid */
 			tcpip_adapter_ip_info_t ip_info;
 			ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(ESP_IF_WIFI_STA, &ip_info));
 
-			char ip[IP4ADDR_STRLEN_MAX];
+			char ip[IP4ADDR_STRLEN_MAX]; /* note: IP4ADDR_STRLEN_MAX is defined in lwip */
 			char gw[IP4ADDR_STRLEN_MAX];
 			char netmask[IP4ADDR_STRLEN_MAX];
 
-            sprintf(ip, ""IPSTR, IP2STR(&ip_info.ip));
-            sprintf(gw, ""IPSTR, IP2STR(&ip_info.gw));
-            sprintf(netmask, ""IPSTR, IP2STR(&ip_info.netmask));
+			sprintf(ip, ""IPSTR, IP2STR(&ip_info.ip));
+			sprintf(gw, ""IPSTR, IP2STR(&ip_info.gw));
+			sprintf(netmask, ""IPSTR, IP2STR(&ip_info.netmask));
 
-			cJSON_AddStringToObject(root, "ip", ip);
-			cJSON_AddStringToObject(root, "gw", gw);
-			cJSON_AddStringToObject(root, "netmask", netmask);
-			cJSON_AddNumberToObject(root, "urc", (int)update_reason_code);
-			cJSON_AddNumberToObject(root, "httpc", http_client_status);
-		}else {
-			cJSON_AddStringToObject(root, "ip", "0");
-			cJSON_AddStringToObject(root, "gw", "0");
-			cJSON_AddStringToObject(root, "netmask", "0");
-			cJSON_AddNumberToObject(root, "urc", (int)update_reason_code);
-			cJSON_AddNumberToObject(root, "httpc", http_client_status);
+			snprintf( (ip_info_json + ip_info_json_len), remaining, ip_info_json_format,
+					ip,
+					netmask,
+					gw,
+					(int)update_reason_code,
+					http_client_status);
 		}
-		const char* json_string = cJSON_Print(root);
-		cJSON_Delete(root);
-		strcpy(ip_info_json, json_string);
-		free((void *)json_string);		
-	}else {
-		wifi_manager_clear_ip_info_json();
+		else{
+			/* notify in the json output the reason code why this was updated without a connection */
+			snprintf( (ip_info_json + ip_info_json_len), remaining, ip_info_json_format,
+								"0",
+								"0",
+								"0",
+								(int)update_reason_code);
+		}
 	}
+	else{
+		wifi_manager_clear_ip_info_json();
+	}	
 }
 
 void wifi_manager_clear_access_points_json(){
@@ -314,7 +320,7 @@ void wifi_manager_generate_acess_points_json() {
 	strcpy(accessp_json, "[");
 
 
-	const char oneap_str[] = ",\"chan\":%d,\"rssi\":%d,\"auth\":%d}%c\n";
+	const char oneap_str[] = "{\"ssid\":\"%s\",\"chan\":%d,\"rssi\":%d,\"auth\":%d}%c\n";
 
 	/* stack buffer to hold on to one AP until it's copied over to accessp_json */
 	char one_ap[JSON_ONE_APP_SIZE];
@@ -322,12 +328,9 @@ void wifi_manager_generate_acess_points_json() {
 
 		wifi_ap_record_t ap = accessp_records[i];
 
-		/* ssid needs to be json escaped. To save on heap memory it's directly printed at the correct address */
-		strcat(accessp_json, "{\"ssid\":");
-		json_print_string( (unsigned char*)ap.ssid,  (unsigned char*)(accessp_json+strlen(accessp_json)) );
-
 		/* print the rest of the json for this access point: no more string to escape */
 		snprintf(one_ap, (size_t)JSON_ONE_APP_SIZE, oneap_str,
+				(char*)ap.ssid,
 				ap.primary,
 				ap.rssi,
 				ap.authmode,
@@ -545,7 +548,6 @@ void free_esp8266_config(esp8266_config_t* config) {
 	free((void *)config->wifi_identity);
 	free((void *)config->wifi_password);
 	free((void *)config->wifi_auth);
-	free((void *)config->wifi_inner);
 	free((void *)config->wifi_ca);
 	free((void *)config->wifi_crt);
 	free((void *)config->wifi_key);
@@ -560,7 +562,8 @@ void free_esp8266_config(esp8266_config_t* config) {
 	free((void *)config->server_address);
 	free((void *)config->server_port);
 	free((void *)config->server_auth);
-	free((void *)config->ota_api);
+	free((void *)config->esp_json_key);
+	free((void *)config->stm_json_key);
 	free((void *)config->client_username);
 	free((void *)config->client_password);
 	free((void *)config->client_ca);
@@ -726,8 +729,8 @@ void wifi_manager( void * pvParameters ){
 
 
 	/* by default the mode is STA because wifi_manager will not start the access point unless it has to! */
-	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-	ESP_ERROR_CHECK(esp_wifi_start());
+	// ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+	// ESP_ERROR_CHECK(esp_wifi_start());
 
 	/* start http server */
 	http_app_start(false);
@@ -816,6 +819,18 @@ void wifi_manager( void * pvParameters ){
 					esp_restart();
 				}
 
+				ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+				ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, wifi_manager_get_wifi_sta_config()));
+				if(uxBits & WIFI_MANAGER_SCAN_BIT){
+					esp_wifi_scan_stop();
+				}
+				if (authmode == WIFI_AUTH_WPA2_ENTERPRISE) {
+					ESP_ERROR_CHECK(esp_wifi_sta_wpa2_ent_enable());
+				}else {
+					ESP_ERROR_CHECK(esp_wifi_sta_wpa2_ent_disable());
+				}
+				ESP_ERROR_CHECK(esp_wifi_start());
+
 				break;
 
 			case WM_ORDER_CONNECT_STA:
@@ -837,18 +852,29 @@ void wifi_manager( void * pvParameters ){
 				uxBits = xEventGroupGetBits(wifi_manager_event_group);
 				if( ! (uxBits & WIFI_MANAGER_WIFI_CONNECTED_BIT) ){
 					/* update config to latest and attempt connection */
-					ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, wifi_manager_get_wifi_sta_config()));
+					// const char id[]="guest";
+					// const char pa[]="76543210432222";
+					// wifi_config_t wifi_config = {
+					// 		.sta = {
+					// 				.ssid = "DAP-1",
+					// 		},
+					// };
+					// ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
+					// ESP_ERROR_CHECK(esp_wifi_sta_wpa2_ent_set_identity((uint8_t*)id, strlen(id)));
+					// ESP_ERROR_CHECK(esp_wifi_sta_wpa2_ent_set_username((uint8_t*)id, strlen(id)));
+					// ESP_ERROR_CHECK(esp_wifi_sta_wpa2_ent_set_password((uint8_t*)pa, strlen(pa)));
+					// ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, wifi_manager_get_wifi_sta_config()));
 
 					/* if there is a wifi scan in progress abort it first
 					   Calling esp_wifi_scan_stop will trigger a SCAN_DONE event which will reset this bit */
-					if(uxBits & WIFI_MANAGER_SCAN_BIT){
-						esp_wifi_scan_stop();
-					}
-					if (authmode == WIFI_AUTH_WPA2_ENTERPRISE) {
-						ESP_ERROR_CHECK(esp_wifi_sta_wpa2_ent_enable());
-					}else {
-						ESP_ERROR_CHECK(esp_wifi_sta_wpa2_ent_disable());
-					}
+					// if(uxBits & WIFI_MANAGER_SCAN_BIT){
+					// 	esp_wifi_scan_stop();
+					// }
+					// if (authmode == WIFI_AUTH_WPA2_ENTERPRISE) {
+					// 	ESP_ERROR_CHECK(esp_wifi_sta_wpa2_ent_enable());
+					// }else {
+					// 	ESP_ERROR_CHECK(esp_wifi_sta_wpa2_ent_disable());
+					// }
 					ESP_ERROR_CHECK(esp_wifi_connect());
 				}
 
@@ -951,7 +977,7 @@ void wifi_manager( void * pvParameters ){
 				start_dns_server();
 
 				/* callback */
-				// if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
+				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
 
 				break;
 

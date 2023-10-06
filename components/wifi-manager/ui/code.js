@@ -333,68 +333,56 @@ async function createSetup() {
   hide("navigation");
   show("loading");
 
-  for (const [key, value] of Object.entries(GetCertificates())) {
-    const reader = new FileReader();
-    const file = gel(value).files[0];
-    if(file) {
-      reader.readAsText(file);
-      reader.onerror = function () {
-        console.log("File read error");
-      };
-      reader.onload = async () => {
-        const url = `${key}.json`;
-        let response = await fetch(url, {
-          method: "POST",
-          headers: {
-            'Content-Type': 'application/json;charset=utf-8'
-          },
-          body: reader.result
-        });
-        if(!response.ok) {
-          console.log('cert '`${key}' fail'`);
-          hide("loading");
-          show("setup-fail");
-          return;
-        } 
-      };
+  const setup = await GetSetup();
+
+  let count = Object.keys(setup).length;
+
+  const timeout = () => { 
+    if (count === 0) {
+      connect();
+    }else {
+      hide("loading");
+      show("setup-fail");
     }
-  }
+  };
 
-  const setups = {
-    "http_setup.json": GetHttpSetup(),
-    "ipv4_setup.json": GetIpv4Setup(),
-    "wifi_setup.json": GetWifiSetup(),
-  }
+  let timer = setTimeout(timeout, 5000);
 
-  for (const [key, value] of Object.entries(setups)) {
-    // console.log({[key]: value});
-    let response = await fetch(key, {
+  const connect = () => {
+    clearTimeout(timer);
+    fetch("connect") 
+    .then(function (res) {
+      if(res.status === 200) {
+        selectedForm = "ap_select";
+        hide("loading");
+        show("ap_select"); 
+      }else {
+        hide("loading");
+        show("setup-fail"); 
+      }
+    })
+    .catch (function (error) {
+      console.log('Connect error: ', error);
+      hide("loading");
+      show("setup-fail");
+    });
+  };
+
+  for (const [key, value] of Object.entries(setup)) {
+      fetch(key, {
       method: "POST",
       headers: {
         'Content-Type': 'application/json;charset=utf-8'
       },
-      body: JSON.stringify(value)
-    });
-    if(!response.ok) {
-      console.log(`${key}' fail'`);
-      hide("loading");
-      show("setup-fail");
-      return;
-    } 
+      body: value
+    })
+    .finally(() => {
+      --count;
+      if(count === 0) {
+        connect();
+      }
+    })
   }
-
-  let response = await fetch("connect");
-  if(!response.ok) {
-    console.log(`${key}' fail'`);
-    hide("loading");
-    show("setup-fail");
-    return;
-  } 
-
-
-  selectedForm = "ap_select";
-  hide("loading");
-  show("ap_select");
 }
 
 function GetHttpSetup() {
@@ -434,8 +422,8 @@ function GetWifiSetup() {
   }
 }
 
-function GetCertificates() {
-  return {
+async function GetSetup() {
+  let setup = {
     client_ca: "client_ca",
     client_crt: "client_crt",
     client_key: "client_key",
@@ -443,6 +431,17 @@ function GetCertificates() {
     wifi_crt: "wifi_crt",
     wifi_key: "wifi_key",
   }
+
+  for (const [key, value] of Object.entries(setup)){
+    const file = gel(value).files[0];
+    setup[key] = JSON.stringify({[key]: (file) ? await file.text() : ''});
+  }
+
+  setup["wifi_setup"] = JSON.stringify(GetWifiSetup());
+  setup["ipv4_setup"] = JSON.stringify(GetIpv4Setup());
+  setup["http_setup"] = JSON.stringify(GetHttpSetup());
+
+  return setup;
 }
 
 function handleGoBackClick() {

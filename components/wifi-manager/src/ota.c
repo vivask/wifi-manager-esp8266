@@ -18,7 +18,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
    ----------------------------------------------------------------------
 
-@see https://github.com/vivask/esp32-wifi-manager
+@see https://github.com/vivask/esp8266-wifi-manager
 */
 
 #include <stdio.h>
@@ -54,7 +54,7 @@ bool ota(const char* data, int size) {
     bool ret = false;
     cJSON *root = cJSON_Parse(data);
     esp8266_config_t* wifi_config = wifi_manager_get_config();
-    cJSON* item = cJSON_GetObjectItem(root, wifi_config->ota_api);
+    cJSON* item = cJSON_GetObjectItem(root, wifi_config->esp_json_key);
     if (item && item->valuestring) {
         size_t len = strlen(item->valuestring);
         if (len) {
